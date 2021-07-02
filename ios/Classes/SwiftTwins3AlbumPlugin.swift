@@ -6,6 +6,9 @@ public class SwiftTwins3AlbumPlugin: NSObject, FlutterPlugin {
     let channel = FlutterMethodChannel(name: "twins3_album", binaryMessenger: registrar.messenger())
     let instance = SwiftTwins3AlbumPlugin()
     registrar.addMethodCallDelegate(instance, channel: channel)
+    
+    let factory = FLAlbumGridViewFactory(messenger: registrar.messenger())
+    registrar.register(factory, withId: "twins3_album_view")
   }
 
   public func handle(_ call: FlutterMethodCall, result: @escaping FlutterResult) {

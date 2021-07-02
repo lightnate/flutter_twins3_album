@@ -1,0 +1,22 @@
+PODS:
+  - Flutter (1.0.0)
+  - twins3_album (0.0.1):
+    - Flutter
+
+DEPENDENCIES:
+  - Flutter (from `Flutter`)
+  - twins3_album (from `.symlinks/plugins/twins3_album/ios`)
+
+EXTERNAL SOURCES:
+  Flutter:
+    :path: Flutter
+  twins3_album:
+    :path: ".symlinks/plugins/twins3_album/ios"
+
+SPEC CHECKSUMS:
+  Flutter: 434fef37c0980e73bb6479ef766c45957d4b510c
+  twins3_album: 350b1d1599f1e7094904e044cf61e55b54550939
+
+PODFILE CHECKSUM: aafe91acc616949ddb318b77800a7f51bffa2a4c
+
+COCOAPODS: 1.10.1

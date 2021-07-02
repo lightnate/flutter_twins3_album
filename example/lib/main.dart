@@ -3,6 +3,7 @@ import 'dart:async';
 
 import 'package:flutter/services.dart';
 import 'package:twins3_album/twins3_album.dart';
+import 'package:twins3_album/twins3_album_ios.dart';
 
 void main() {
   runApp(MyApp());
@@ -50,7 +51,7 @@ class _MyAppState extends State<MyApp> {
           title: const Text('Plugin example app'),
         ),
         body: Center(
-          child: Text('Running on: $_platformVersion\n'),
+          child: Twins3AlbumView(),
         ),
       ),
     );
