@@ -51,8 +51,10 @@ class AlbumGridView: NSObject, FlutterPlatformView, UICollectionViewDelegate, UI
     let sectionLocalizedTitles = ["", NSLocalizedString("Smart Albums", comment: ""), NSLocalizedString("Albums", comment: "")]
     
     let cellGap: CGFloat = 1 // cell 间距
-    let gridRowCount: CGFloat = 3 // 网格每行数量
-
+    let gridColCount: CGFloat = 3 // 网格每行数量
+    
+    var selectedPhotoIndexPathList: [IndexPath] = []
+    
     init(
         frame: CGRect,
         viewIdentifier viewId: Int64,
@@ -78,6 +80,7 @@ class AlbumGridView: NSObject, FlutterPlatformView, UICollectionViewDelegate, UI
     }
     
     func setAlbumData() {
+
         // 获取相册信息
         let allPhotosOptions = PHFetchOptions()
         allPhotosOptions.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: true)]
@@ -91,6 +94,12 @@ class AlbumGridView: NSObject, FlutterPlatformView, UICollectionViewDelegate, UI
         // 设置collectview代理和数据源
         _gridView.delegate = self
         _gridView.dataSource = self
+        
+        // 设置collectview允许多选
+        _gridView.allowsMultipleSelection = true
+        
+        _gridView.backgroundColor = .white
+        
         // 注册cell
         _gridView.register(AlbumGridCellView.self, forCellWithReuseIdentifier: _gridCellReuseIdentifier)
         
@@ -99,7 +108,7 @@ class AlbumGridView: NSObject, FlutterPlatformView, UICollectionViewDelegate, UI
         // 设置cell纵向间距
         _layout.minimumLineSpacing = cellGap
         // 设置cell尺寸
-        let sideLength = (_width - ((gridRowCount - 1) * cellGap)) / gridRowCount
+        let sideLength = (_width - ((gridColCount - 1) * cellGap)) / gridColCount
         _layout.itemSize = CGSize(width: sideLength, height: sideLength)
         // 设置缩略图尺寸
         let scale = UIScreen.main.scale
@@ -133,17 +142,18 @@ class AlbumGridView: NSObject, FlutterPlatformView, UICollectionViewDelegate, UI
         return allPhotos.count;
     }
     
+    // 渲染cell
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
         let asset = allPhotos.object(at: indexPath.item)
         // Dequeue a GridViewCell.
         guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: _gridCellReuseIdentifier, for: indexPath) as? AlbumGridCellView
             else { fatalError("Unexpected cell in collection view") }
         
-        // Add a badge to the cell if the PHAsset represents a Live Photo.
-        if #available(iOS 9.1, *) {
-            if asset.mediaSubtypes.contains(.photoLive) {
-                cell.livePhotoBadgeImage = PHLivePhotoView.livePhotoBadgeImage(options: .overContent)
-            }
+        // 滚动时重新设置是否选择，防止顺序错乱
+        if cell.isSelected && selectedPhotoIndexPathList.contains(indexPath) {
+            cell.textLabel = "\(selectedPhotoIndexPathList.firstIndex(of: indexPath)! + 1)"
+        } else {
+            cell.textLabel = nil
         }
         
         // Request an image for the asset from the PHCachingImageManager.
@@ -159,8 +169,28 @@ class AlbumGridView: NSObject, FlutterPlatformView, UICollectionViewDelegate, UI
         return cell
     }
     
+    // 选中cell，isSelected会设置为true
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
-        print(indexPath)
+        let cell = collectionView.cellForItem(at: indexPath) as! AlbumGridCellView
+        // 保存选中的图片索引
+        selectedPhotoIndexPathList.append(indexPath)
+        // 设置选中顺序
+        cell.textLabel = "\(selectedPhotoIndexPathList.endIndex)"
+    }
+    
+    // 取消选中cell，isSelected会设置为false
+    func collectionView(_ collectionView: UICollectionView, didDeselectItemAt indexPath: IndexPath) {
+        let cell = collectionView.cellForItem(at: indexPath) as! AlbumGridCellView
+        let idx = selectedPhotoIndexPathList.firstIndex(of: indexPath)!
+        // 移除选中的图片索引
+        selectedPhotoIndexPathList.remove(at: idx)
+        cell.textLabel = nil
+
+        // 重新设置其他选中图片的选中顺序
+        for (index, item) in selectedPhotoIndexPathList.enumerated() {
+            let c = collectionView.cellForItem(at: item) as! AlbumGridCellView
+            c.textLabel = "\(index + 1)"
+        }
     }
     
     // MARK: UIScrollView
@@ -235,9 +265,11 @@ class AlbumGridView: NSObject, FlutterPlatformView, UICollectionViewDelegate, UI
 class AlbumGridCellView: UICollectionViewCell {
     
     var imageView: UIImageView!
-    var livePhotoBadgeImageView: UIImageView!
     var representedAssetIdentifier: String!
-    var label: UILabel!
+    private var coverView: UIView?
+    private var selectedLabel: UILabel?
+    
+    let radius: CGFloat = 12
     
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -245,9 +277,7 @@ class AlbumGridCellView: UICollectionViewCell {
         imageView = UIImageView(frame: CGRect(origin: CGPoint.zero, size: frame.size))
         imageView.contentMode = .scaleAspectFill
         imageView.clipsToBounds = true
-        livePhotoBadgeImageView = UIImageView(frame: CGRect(x: 40, y: 0, width: 10, height: 10))
         addSubview(imageView)
-//        addSubview(livePhotoBadgeImageView)
     }
     
     required init?(coder: NSCoder) {
@@ -259,16 +289,41 @@ class AlbumGridCellView: UICollectionViewCell {
             imageView.image = thumbnailImage
         }
     }
-    var livePhotoBadgeImage: UIImage! {
+    
+    var textLabel: String! {
         didSet {
-            livePhotoBadgeImageView.image = livePhotoBadgeImage
+            if isSelected {
+                coverView?.removeFromSuperview()
+                selectedLabel?.removeFromSuperview()
+                
+                coverView = UIView(frame: CGRect(origin: CGPoint.zero, size: frame.size))
+                coverView?.backgroundColor = .primary_99
+                addSubview(coverView!)
+                
+                let diameter = radius * 2
+                
+                selectedLabel = UILabel(frame: CGRect(origin: CGPoint(x: frame.width - 6 - diameter, y: 6), size: CGSize(width: diameter, height: diameter)))
+                selectedLabel?.layer.cornerRadius = radius
+                selectedLabel?.clipsToBounds = true
+                selectedLabel?.backgroundColor = .white
+                selectedLabel?.textColor = .primary
+                selectedLabel?.text = textLabel
+                selectedLabel?.textAlignment = .center
+                
+                addSubview(selectedLabel!)
+            } else {
+                coverView?.removeFromSuperview()
+                selectedLabel?.removeFromSuperview()
+                coverView = nil
+                selectedLabel = nil
+            }
+            
         }
     }
     
     override func prepareForReuse() {
         super.prepareForReuse()
         imageView.image = nil
-        livePhotoBadgeImageView.image = nil
     }
     
 }
