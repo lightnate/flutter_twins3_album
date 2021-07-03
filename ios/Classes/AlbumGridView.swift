@@ -21,6 +21,12 @@ class FLAlbumGridViewFactory: NSObject, FlutterPlatformViewFactory {
             viewIdentifier: viewId,
             arguments: args,
             binaryMessenger: messenger)
+    
+    /** 添加此函数才能接受到 args 参数 */
+    public func createArgsCodec() -> FlutterMessageCodec & NSObjectProtocol {
+          return FlutterStandardMessageCodec.sharedInstance()
+    }
+    
     }
 }
 
