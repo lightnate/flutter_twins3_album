@@ -3,6 +3,7 @@ import 'dart:async';
 
 import 'package:flutter/services.dart';
 import 'package:twins3_album/twins3_album.dart';
+import 'package:twins3_album/twins3_album_channel.dart';
 import 'package:twins3_album/twins3_album_ios.dart';
 
 void main() {
@@ -20,7 +21,17 @@ class _MyAppState extends State<MyApp> {
   @override
   void initState() {
     super.initState();
-    initPlatformState();
+    // initPlatformState();
+
+    var timer = Timer(Duration(seconds: 2), () {
+      MyChannel.getAlbumList().then((value) {
+        print(value);
+      });
+
+      MyChannel.startEventListener((data) {
+        print(data);
+      });
+    });
   }
 
   // Platform messages are asynchronous, so we initialize in an async method.

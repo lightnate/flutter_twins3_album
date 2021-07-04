@@ -5,6 +5,7 @@ import PhotosUI
 
 class FLAlbumGridViewFactory: NSObject, FlutterPlatformViewFactory {
     private var messenger: FlutterBinaryMessenger
+    private var albumGridView: AlbumGridView!
 
     init(messenger: FlutterBinaryMessenger) {
         self.messenger = messenger
@@ -16,17 +17,26 @@ class FLAlbumGridViewFactory: NSObject, FlutterPlatformViewFactory {
         viewIdentifier viewId: Int64,
         arguments args: Any?
     ) -> FlutterPlatformView {
-        return AlbumGridView(
+        
+        albumGridView = AlbumGridView(
             frame: frame,
             viewIdentifier: viewId,
             arguments: args,
             binaryMessenger: messenger)
+        return albumGridView
+    }
     
     /** 添加此函数才能接受到 args 参数 */
     public func createArgsCodec() -> FlutterMessageCodec & NSObjectProtocol {
           return FlutterStandardMessageCodec.sharedInstance()
     }
     
+    func getAlbumList(result: FlutterResult) {
+        if albumGridView != nil {
+            albumGridView.getAlbumList(result: result)
+        } else {
+            print("GG")
+        }
     }
 }
 
@@ -37,7 +47,10 @@ private extension UICollectionView {
     }
 }
 
-class AlbumGridView: NSObject, FlutterPlatformView, UICollectionViewDelegate, UICollectionViewDataSource, UICollectionViewDelegateFlowLayout, PHPhotoLibraryChangeObserver {
+class AlbumGridView: NSObject, FlutterPlatformView, FlutterStreamHandler, UICollectionViewDelegate, UICollectionViewDataSource, UICollectionViewDelegateFlowLayout, PHPhotoLibraryChangeObserver {
+    
+    var eventChan: FlutterEventChannel!
+    var eventSink: FlutterEventSink?
     
     var _view: UIView = UIView()
     var _layout: UICollectionViewFlowLayout = UICollectionViewFlowLayout()
@@ -67,14 +80,20 @@ class AlbumGridView: NSObject, FlutterPlatformView, UICollectionViewDelegate, UI
         arguments args: Any?,
         binaryMessenger messenger: FlutterBinaryMessenger?
     ) {
-        // 初始化
+        // 初始化view
         _gridView = UICollectionView(frame: CGRect.zero, collectionViewLayout: _layout)
         
         super.init()
         
+        // 初始化事件通道
+        eventChan = FlutterEventChannel(name: "twins3_album_event", binaryMessenger: messenger!)
+        eventChan.setStreamHandler(self)
+        
         setAlbumData()
         setGridView()
         createNativeView(view: _view)
+        
+        print(args)
     }
     
     deinit {
@@ -182,6 +201,8 @@ class AlbumGridView: NSObject, FlutterPlatformView, UICollectionViewDelegate, UI
         selectedPhotoIndexPathList.append(indexPath)
         // 设置选中顺序
         cell.textLabel = "\(selectedPhotoIndexPathList.endIndex)"
+        
+        eventSink?("???")
     }
     
     // 取消选中cell，isSelected会设置为false
@@ -268,68 +289,29 @@ class AlbumGridView: NSObject, FlutterPlatformView, UICollectionViewDelegate, UI
     }
 }
 
-class AlbumGridCellView: UICollectionViewCell {
+extension AlbumGridView {
+    // MARK: Flutter Method
     
-    var imageView: UIImageView!
-    var representedAssetIdentifier: String!
-    private var coverView: UIView?
-    private var selectedLabel: UILabel?
-    
-    let radius: CGFloat = 12
-    
-    override init(frame: CGRect) {
-        super.init(frame: frame)
-        
-        imageView = UIImageView(frame: CGRect(origin: CGPoint.zero, size: frame.size))
-        imageView.contentMode = .scaleAspectFill
-        imageView.clipsToBounds = true
-        addSubview(imageView)
-    }
-    
-    required init?(coder: NSCoder) {
-        fatalError("init(coder:) has not been implemented")
-    }
-    
-    var thumbnailImage: UIImage! {
-        didSet {
-            imageView.image = thumbnailImage
+    func getAlbumList(result: FlutterResult) {
+        var list: [String] = []
+        smartAlbums.enumerateObjects { (collection, int, _) in
+            list.append(collection.localizedTitle ?? "")
         }
+        result(list)
     }
     
-    var textLabel: String! {
-        didSet {
-            if isSelected {
-                coverView?.removeFromSuperview()
-                selectedLabel?.removeFromSuperview()
-                
-                coverView = UIView(frame: CGRect(origin: CGPoint.zero, size: frame.size))
-                coverView?.backgroundColor = .primary_99
-                addSubview(coverView!)
-                
-                let diameter = radius * 2
-                
-                selectedLabel = UILabel(frame: CGRect(origin: CGPoint(x: frame.width - 6 - diameter, y: 6), size: CGSize(width: diameter, height: diameter)))
-                selectedLabel?.layer.cornerRadius = radius
-                selectedLabel?.clipsToBounds = true
-                selectedLabel?.backgroundColor = .white
-                selectedLabel?.textColor = .primary
-                selectedLabel?.text = textLabel
-                selectedLabel?.textAlignment = .center
-                
-                addSubview(selectedLabel!)
-            } else {
-                coverView?.removeFromSuperview()
-                selectedLabel?.removeFromSuperview()
-                coverView = nil
-                selectedLabel = nil
-            }
-            
-        }
+    // MARK: FlutterStreamHandler
+    
+    /** flutter 端开启监听回调 */
+    func onListen(withArguments arguments: Any?, eventSink events: @escaping FlutterEventSink) -> FlutterError? {
+        debugPrint("onlisten")
+        self.eventSink = events
+        return nil
     }
     
-    override func prepareForReuse() {
-        super.prepareForReuse()
-        imageView.image = nil
+    /** flutter 端取消监听回调 */
+    func onCancel(withArguments arguments: Any?) -> FlutterError? {
+        debugPrint("oncancel")
+        return nil
     }
-    
 }
