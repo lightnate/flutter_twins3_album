@@ -43,10 +43,10 @@ private extension UICollectionView {
 
 class AlbumGridView: NSObject, FlutterPlatformView, FlutterStreamHandler, UICollectionViewDelegate, UICollectionViewDataSource, UICollectionViewDelegateFlowLayout, PHPhotoLibraryChangeObserver {
     
-    var eventChan: FlutterEventChannel!
-    var eventSink: FlutterEventSink?
+    var _eventChan: FlutterEventChannel!
+    var _eventSink: FlutterEventSink?
     
-    var methodChan: FlutterMethodChannel!
+    var _methodChan: FlutterMethodChannel!
     
     var _args: Dictionary<String, Any>
     var _view: UIView = UIView()
@@ -56,20 +56,18 @@ class AlbumGridView: NSObject, FlutterPlatformView, FlutterStreamHandler, UIColl
     let _width = UIScreen.main.bounds.size.width //获取屏幕宽
     let _gridCellReuseIdentifier = "AlbumGridCellView"
     
-    fileprivate let imageManager = PHCachingImageManager()
-    fileprivate var thumbnailSize: CGSize!
-    fileprivate var previousPreheatRect = CGRect.zero
+    fileprivate let _imageManager = PHCachingImageManager()
+    fileprivate var _thumbnailSize: CGSize!
+    fileprivate var _previousPreheatRect = CGRect.zero
     
-    // MARK: Properties
-    var allPhotos: PHFetchResult<PHAsset>!
-    var smartAlbums: PHFetchResult<PHAssetCollection>!
-    var userCollections: PHFetchResult<PHCollection>!
-    let sectionLocalizedTitles = ["", NSLocalizedString("Smart Albums", comment: ""), NSLocalizedString("Albums", comment: "")]
+    var _curAssetList: PHFetchResult<PHAsset>! // 当前显示的图片列表
+    var _smartAlbums: PHFetchResult<PHAssetCollection>! // 智能相册列表
+    var _userCollections: PHFetchResult<PHCollection>! // 用户相册列表
     
-    let cellGap: CGFloat = 1 // cell 间距
-    let gridColCount: CGFloat = 3 // 网格每行数量
+    let _cellGap: CGFloat = 1 // cell 间距
+    let _gridColCount: CGFloat = 3 // 网格每行数量
     
-    var selectedAssetIdentifierList: [String] = []
+    var _selectedAssetIdentifierList: [String] = []
     
     init(
         frame: CGRect,
@@ -84,12 +82,12 @@ class AlbumGridView: NSObject, FlutterPlatformView, FlutterStreamHandler, UIColl
         super.init()
         
         // 初始化方法通道
-        methodChan = FlutterMethodChannel(name: "twins3_album", binaryMessenger: messenger!)
-        methodChan.setMethodCallHandler(methodCallHandler)
+        _methodChan = FlutterMethodChannel(name: "twins3_album", binaryMessenger: messenger!)
+        _methodChan.setMethodCallHandler(methodCallHandler)
         
         // 初始化事件通道
-        eventChan = FlutterEventChannel(name: "twins3_album_event", binaryMessenger: messenger!)
-        eventChan.setStreamHandler(self)
+        _eventChan = FlutterEventChannel(name: "twins3_album_event", binaryMessenger: messenger!)
+        _eventChan.setStreamHandler(self)
         
         setAlbumData()
         setGridView()
@@ -109,9 +107,9 @@ class AlbumGridView: NSObject, FlutterPlatformView, FlutterStreamHandler, UIColl
         // 获取相册信息
         let allPhotosOptions = PHFetchOptions()
         allPhotosOptions.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: true)]
-        allPhotos = PHAsset.fetchAssets(with: allPhotosOptions)
-        smartAlbums = PHAssetCollection.fetchAssetCollections(with: .smartAlbum, subtype: .albumRegular, options: nil)
-        userCollections = PHCollectionList.fetchTopLevelUserCollections(with: nil)
+        _curAssetList = PHAsset.fetchAssets(with: allPhotosOptions)
+        _smartAlbums = PHAssetCollection.fetchAssetCollections(with: .smartAlbum, subtype: .albumRegular, options: nil)
+        _userCollections = PHCollectionList.fetchTopLevelUserCollections(with: nil)
         PHPhotoLibrary.shared().register(self)
     }
     
@@ -129,16 +127,16 @@ class AlbumGridView: NSObject, FlutterPlatformView, FlutterStreamHandler, UIColl
         _gridView.register(AlbumGridCellView.self, forCellWithReuseIdentifier: _gridCellReuseIdentifier)
         
         // 设置cell横向间距
-        _layout.minimumInteritemSpacing = cellGap
+        _layout.minimumInteritemSpacing = _cellGap
         // 设置cell纵向间距
-        _layout.minimumLineSpacing = cellGap
+        _layout.minimumLineSpacing = _cellGap
         // 设置cell尺寸
-        let sideLength = (_width - ((gridColCount - 1) * cellGap)) / gridColCount
+        let sideLength = (_width - ((_gridColCount - 1) * _cellGap)) / _gridColCount
         _layout.itemSize = CGSize(width: sideLength, height: sideLength)
         // 设置缩略图尺寸
         let scale = UIScreen.main.scale
         let cellSize = _layout.itemSize
-        thumbnailSize = CGSize(width: cellSize.width * scale, height: cellSize.height * scale)
+        _thumbnailSize = CGSize(width: cellSize.width * scale, height: cellSize.height * scale)
     }
     
     func createNativeView(view _view: UIView){
@@ -164,19 +162,19 @@ class AlbumGridView: NSObject, FlutterPlatformView, FlutterStreamHandler, UIColl
     // MARK: UICollectionView
     
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
-        return allPhotos.count;
+        return _curAssetList.count;
     }
     
     // 渲染cell
     func collectionView(_ collectionView: UICollectionView, cellForItemAt indexPath: IndexPath) -> UICollectionViewCell {
-        let asset = allPhotos.object(at: indexPath.item)
+        let asset = _curAssetList.object(at: indexPath.item)
         // Dequeue a GridViewCell.
         guard let cell = collectionView.dequeueReusableCell(withReuseIdentifier: _gridCellReuseIdentifier, for: indexPath) as? AlbumGridCellView
             else { fatalError("Unexpected cell in collection view") }
         
         // 滚动时重新设置是否选择，防止顺序错乱
-        if selectedAssetIdentifierList.contains(asset.localIdentifier) {
-            cell.textLabel = "\(selectedAssetIdentifierList.firstIndex(of: asset.localIdentifier)! + 1)"
+        if _selectedAssetIdentifierList.contains(asset.localIdentifier) {
+            cell.textLabel = "\(_selectedAssetIdentifierList.firstIndex(of: asset.localIdentifier)! + 1)"
             cell.isChose = true
         } else {
             cell.textLabel = nil
@@ -185,7 +183,7 @@ class AlbumGridView: NSObject, FlutterPlatformView, FlutterStreamHandler, UIColl
         
         // Request an image for the asset from the PHCachingImageManager.
         cell.representedAssetIdentifier = asset.localIdentifier
-        imageManager.requestImage(for: asset, targetSize: thumbnailSize, contentMode: .aspectFit, options: nil, resultHandler: { image, _ in
+        _imageManager.requestImage(for: asset, targetSize: _thumbnailSize, contentMode: .aspectFit, options: nil, resultHandler: { image, _ in
             // UIKit may have recycled this cell by the handler's activation time.
             // Set the cell's thumbnail image only if it's still showing the same asset.
             if cell.representedAssetIdentifier == asset.localIdentifier {
@@ -207,19 +205,19 @@ class AlbumGridView: NSObject, FlutterPlatformView, FlutterStreamHandler, UIColl
     }
     
     func onSelect(collectionView: UICollectionView, indexPath: IndexPath) {
-        let asset = allPhotos.object(at: indexPath.item)
+        let asset = _curAssetList.object(at: indexPath.item)
         guard let cell = collectionView.cellForItem(at: indexPath) as? AlbumGridCellView
             else { fatalError("Unexpected cell in collection view") }
         
         if cell.isChose {
-            let idx = selectedAssetIdentifierList.firstIndex(of: asset.localIdentifier)!
+            let idx = _selectedAssetIdentifierList.firstIndex(of: asset.localIdentifier)!
             // 移除选中的图片索引
-            selectedAssetIdentifierList.remove(at: idx)
+            _selectedAssetIdentifierList.remove(at: idx)
             cell.textLabel = nil
             cell.isChose = false
 
             // 重新设置其他选中图片的选中顺序
-            for (index, identifier) in selectedAssetIdentifierList.enumerated() {
+            for (index, identifier) in _selectedAssetIdentifierList.enumerated() {
                 for (_, item) in collectionView.visibleCells.enumerated() {
                     let c = item as! AlbumGridCellView
                     if c.representedAssetIdentifier == identifier {
@@ -230,9 +228,9 @@ class AlbumGridView: NSObject, FlutterPlatformView, FlutterStreamHandler, UIColl
             
         } else {
             // 保存选中的图片索引
-            selectedAssetIdentifierList.append(asset.localIdentifier)
+            _selectedAssetIdentifierList.append(asset.localIdentifier)
             // 设置选中顺序
-            cell.textLabel = "\(selectedAssetIdentifierList.endIndex)"
+            cell.textLabel = "\(_selectedAssetIdentifierList.endIndex)"
             cell.isChose = true
             
             
@@ -252,8 +250,8 @@ class AlbumGridView: NSObject, FlutterPlatformView, FlutterStreamHandler, UIColl
     // MARK: Asset Caching
     
     fileprivate func resetCachedAssets() {
-        imageManager.stopCachingImagesForAllAssets()
-        previousPreheatRect = .zero
+        _imageManager.stopCachingImagesForAllAssets()
+        _previousPreheatRect = .zero
     }
     /// - Tag: UpdateAssets
     fileprivate func updateCachedAssets() {
@@ -263,26 +261,26 @@ class AlbumGridView: NSObject, FlutterPlatformView, FlutterStreamHandler, UIColl
         let preheatRect = visibleRect.insetBy(dx: 0, dy: -0.5 * visibleRect.height)
         
         // Update only if the visible area is significantly different from the last preheated area.
-        let delta = abs(preheatRect.midY - previousPreheatRect.midY)
+        let delta = abs(preheatRect.midY - _previousPreheatRect.midY)
         guard delta > _view.bounds.height / 3 else { return }
         
         // Compute the assets to start and stop caching.
-        let (addedRects, removedRects) = differencesBetweenRects(previousPreheatRect, preheatRect)
+        let (addedRects, removedRects) = differencesBetweenRects(_previousPreheatRect, preheatRect)
         let addedAssets = addedRects
             .flatMap { rect in _gridView.indexPathsForElements(in: rect) }
-            .map { indexPath in allPhotos.object(at: indexPath.item) }
+            .map { indexPath in _curAssetList.object(at: indexPath.item) }
         let removedAssets = removedRects
             .flatMap { rect in _gridView.indexPathsForElements(in: rect) }
-            .map { indexPath in allPhotos.object(at: indexPath.item) }
+            .map { indexPath in _curAssetList.object(at: indexPath.item) }
         
         
         // Update the assets the PHCachingImageManager is caching.
-        imageManager.startCachingImages(for: addedAssets,
-                                        targetSize: thumbnailSize, contentMode: .aspectFit, options: nil)
-        imageManager.stopCachingImages(for: removedAssets,
-                                       targetSize: thumbnailSize, contentMode: .aspectFit, options: nil)
+        _imageManager.startCachingImages(for: addedAssets,
+                                        targetSize: _thumbnailSize, contentMode: .aspectFit, options: nil)
+        _imageManager.stopCachingImages(for: removedAssets,
+                                       targetSize: _thumbnailSize, contentMode: .aspectFit, options: nil)
         // Store the computed rectangle for future comparison.
-        previousPreheatRect = preheatRect
+        _previousPreheatRect = preheatRect
     }
     
     fileprivate func differencesBetweenRects(_ old: CGRect, _ new: CGRect) -> (added: [CGRect], removed: [CGRect]) {
@@ -346,7 +344,7 @@ extension AlbumGridView {
                 return
             }
             let photos = PHAsset.fetchAssets(in: firstObj, options: nil)
-            allPhotos = photos
+            _curAssetList = photos
             _gridView.reloadData()
         }
     }
@@ -354,7 +352,7 @@ extension AlbumGridView {
     /** 获取相册列表 */
     func getAlbumList(result: FlutterResult) {
         var list: [AlbumModel] = []
-        smartAlbums.enumerateObjects { (collection, index, _) in
+        _smartAlbums.enumerateObjects { (collection, index, _) in
             let album = AlbumModel()
             let result = PHAsset.fetchAssets(in: collection, options: nil)
             let firstObject = result.firstObject
@@ -365,7 +363,7 @@ extension AlbumGridView {
             list.append(album)
         }
         
-        userCollections.enumerateObjects { (collection, index, _) in
+        _userCollections.enumerateObjects { (collection, index, _) in
             let album = AlbumModel()
             let result = PHAsset.fetchAssets(in: collection as! PHAssetCollection, options: nil)
             
@@ -386,17 +384,12 @@ extension AlbumGridView {
         result(arr)
     }
     
-    func getPhotoList(result: FlutterResult) {
-        let localIdentifier = _args["localIdentifier"] as! String
-        let fetchResult = PHAsset.fetchAssets(withLocalIdentifiers: [localIdentifier], options: nil)
-    }
-    
     // MARK: FlutterStreamHandler
     
     /** flutter 端开启监听回调 */
     func onListen(withArguments arguments: Any?, eventSink events: @escaping FlutterEventSink) -> FlutterError? {
         debugPrint("onlisten")
-        self.eventSink = events
+        self._eventSink = events
         return nil
     }
     
