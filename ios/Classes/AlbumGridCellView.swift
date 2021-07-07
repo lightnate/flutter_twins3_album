@@ -2,6 +2,7 @@ class AlbumGridCellView: UICollectionViewCell {
     
     var imageView: UIImageView!
     var representedAssetIdentifier: String!
+    var isChose = false
     private var coverView: UIView?
     private var selectedLabel: UILabel?
     
@@ -28,16 +29,16 @@ class AlbumGridCellView: UICollectionViewCell {
     
     var textLabel: String! {
         didSet {
-            if isSelected {
+            if textLabel != nil {
                 coverView?.removeFromSuperview()
                 selectedLabel?.removeFromSuperview()
-                
+
                 coverView = UIView(frame: CGRect(origin: CGPoint.zero, size: frame.size))
                 coverView?.backgroundColor = .primary_99
                 addSubview(coverView!)
-                
+
                 let diameter = radius * 2
-                
+
                 selectedLabel = UILabel(frame: CGRect(origin: CGPoint(x: frame.width - 6 - diameter, y: 6), size: CGSize(width: diameter, height: diameter)))
                 selectedLabel?.layer.cornerRadius = radius
                 selectedLabel?.clipsToBounds = true
@@ -45,7 +46,7 @@ class AlbumGridCellView: UICollectionViewCell {
                 selectedLabel?.textColor = .primary
                 selectedLabel?.text = textLabel
                 selectedLabel?.textAlignment = .center
-                
+
                 addSubview(selectedLabel!)
             } else {
                 coverView?.removeFromSuperview()
@@ -53,13 +54,14 @@ class AlbumGridCellView: UICollectionViewCell {
                 coverView = nil
                 selectedLabel = nil
             }
-            
+
         }
     }
     
     override func prepareForReuse() {
         super.prepareForReuse()
         imageView.image = nil
+        isChose = false
     }
     
 }

@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'dart:async';
 
@@ -17,19 +19,28 @@ class MyApp extends StatefulWidget {
 
 class _MyAppState extends State<MyApp> {
   String _platformVersion = 'Unknown';
+  String _url = "";
 
   @override
   void initState() {
     super.initState();
     // initPlatformState();
 
-    var timer = Timer(Duration(seconds: 2), () {
-      MyChannel.getAlbumList().then((value) {
+    var timer = Timer(Duration(seconds: 1), () {
+      Twins3AlbumChannel.getAlbumList().then((value) {
         print(value);
       });
 
-      MyChannel.startEventListener((data) {
-        print(data);
+      Twins3AlbumChannel.setMethodCallHandler({
+        PlatformMethodName.onSelectImage: (args) {
+          if (args is String) {
+            final file = File(args);
+            file.exists().then((value) => print(value));
+            setState(() {
+              _url = args;
+            });
+          }
+        }
       });
     });
   }
@@ -62,8 +73,18 @@ class _MyAppState extends State<MyApp> {
           title: const Text('Plugin example app'),
         ),
         body: Center(
-          child: Twins3AlbumView(),
-        ),
+            child: Column(
+          children: [
+            Image.file(
+              File(_url),
+              width: 100,
+              height: 100,
+            ),
+            Expanded(
+              child: Twins3AlbumView(),
+            )
+          ],
+        )),
       ),
     );
   }

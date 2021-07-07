@@ -3,7 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
 class Twins3AlbumView extends StatelessWidget {
-  const Twins3AlbumView({Key key}) : super(key: key);
+  const Twins3AlbumView({
+    Key key,
+    this.maxCount = 9,
+  }) : super(key: key);
+
+  /// 可选图片数量
+  final int maxCount;
 
   @override
   Widget build(BuildContext context) {
@@ -11,6 +17,7 @@ class Twins3AlbumView extends StatelessWidget {
     final String viewType = 'twins3_album_view';
     // Pass parameters to the platform side.
     final Map<String, dynamic> creationParams = <String, dynamic>{};
+    creationParams['maxCount'] = maxCount;
 
     // 平台检测
     switch (defaultTargetPlatform) {

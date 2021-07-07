@@ -3,9 +3,13 @@ import UIKit
 import Photos
 import PhotosUI
 
+/** flutter端方法名称 */
+enum FlutterMethodName: String {
+    case onSelectImage
+}
+
 class FLAlbumGridViewFactory: NSObject, FlutterPlatformViewFactory {
     private var messenger: FlutterBinaryMessenger
-    private var albumGridView: AlbumGridView!
 
     init(messenger: FlutterBinaryMessenger) {
         self.messenger = messenger
@@ -17,26 +21,16 @@ class FLAlbumGridViewFactory: NSObject, FlutterPlatformViewFactory {
         viewIdentifier viewId: Int64,
         arguments args: Any?
     ) -> FlutterPlatformView {
-        
-        albumGridView = AlbumGridView(
+        return AlbumGridView(
             frame: frame,
             viewIdentifier: viewId,
             arguments: args,
             binaryMessenger: messenger)
-        return albumGridView
     }
     
     /** 添加此函数才能接受到 args 参数 */
     public func createArgsCodec() -> FlutterMessageCodec & NSObjectProtocol {
           return FlutterStandardMessageCodec.sharedInstance()
-    }
-    
-    func getAlbumList(result: FlutterResult) {
-        if albumGridView != nil {
-            albumGridView.getAlbumList(result: result)
-        } else {
-            print("GG")
-        }
     }
 }
 
@@ -52,6 +46,9 @@ class AlbumGridView: NSObject, FlutterPlatformView, FlutterStreamHandler, UIColl
     var eventChan: FlutterEventChannel!
     var eventSink: FlutterEventSink?
     
+    var methodChan: FlutterMethodChannel!
+    
+    var _args: Dictionary<String, Any>
     var _view: UIView = UIView()
     var _layout: UICollectionViewFlowLayout = UICollectionViewFlowLayout()
     var _gridView: UICollectionView
@@ -72,7 +69,7 @@ class AlbumGridView: NSObject, FlutterPlatformView, FlutterStreamHandler, UIColl
     let cellGap: CGFloat = 1 // cell 间距
     let gridColCount: CGFloat = 3 // 网格每行数量
     
-    var selectedPhotoIndexPathList: [IndexPath] = []
+    var selectedAssetIdentifierList: [String] = []
     
     init(
         frame: CGRect,
@@ -82,8 +79,13 @@ class AlbumGridView: NSObject, FlutterPlatformView, FlutterStreamHandler, UIColl
     ) {
         // 初始化view
         _gridView = UICollectionView(frame: CGRect.zero, collectionViewLayout: _layout)
+        _args = args as! Dictionary<String, Any>
         
         super.init()
+        
+        // 初始化方法通道
+        methodChan = FlutterMethodChannel(name: "twins3_album", binaryMessenger: messenger!)
+        methodChan.setMethodCallHandler(methodCallHandler)
         
         // 初始化事件通道
         eventChan = FlutterEventChannel(name: "twins3_album_event", binaryMessenger: messenger!)
@@ -92,8 +94,6 @@ class AlbumGridView: NSObject, FlutterPlatformView, FlutterStreamHandler, UIColl
         setAlbumData()
         setGridView()
         createNativeView(view: _view)
-        
-        print(args)
     }
     
     deinit {
@@ -175,10 +175,12 @@ class AlbumGridView: NSObject, FlutterPlatformView, FlutterStreamHandler, UIColl
             else { fatalError("Unexpected cell in collection view") }
         
         // 滚动时重新设置是否选择，防止顺序错乱
-        if cell.isSelected && selectedPhotoIndexPathList.contains(indexPath) {
-            cell.textLabel = "\(selectedPhotoIndexPathList.firstIndex(of: indexPath)! + 1)"
+        if selectedAssetIdentifierList.contains(asset.localIdentifier) {
+            cell.textLabel = "\(selectedAssetIdentifierList.firstIndex(of: asset.localIdentifier)! + 1)"
+            cell.isChose = true
         } else {
             cell.textLabel = nil
+            cell.isChose = false
         }
         
         // Request an image for the asset from the PHCachingImageManager.
@@ -196,27 +198,48 @@ class AlbumGridView: NSObject, FlutterPlatformView, FlutterStreamHandler, UIColl
     
     // 选中cell，isSelected会设置为true
     func collectionView(_ collectionView: UICollectionView, didSelectItemAt indexPath: IndexPath) {
-        let cell = collectionView.cellForItem(at: indexPath) as! AlbumGridCellView
-        // 保存选中的图片索引
-        selectedPhotoIndexPathList.append(indexPath)
-        // 设置选中顺序
-        cell.textLabel = "\(selectedPhotoIndexPathList.endIndex)"
-        
-        eventSink?("???")
+        onSelect(collectionView: collectionView, indexPath: indexPath)
     }
     
     // 取消选中cell，isSelected会设置为false
     func collectionView(_ collectionView: UICollectionView, didDeselectItemAt indexPath: IndexPath) {
-        let cell = collectionView.cellForItem(at: indexPath) as! AlbumGridCellView
-        let idx = selectedPhotoIndexPathList.firstIndex(of: indexPath)!
-        // 移除选中的图片索引
-        selectedPhotoIndexPathList.remove(at: idx)
-        cell.textLabel = nil
+        onSelect(collectionView: collectionView, indexPath: indexPath)
+    }
+    
+    func onSelect(collectionView: UICollectionView, indexPath: IndexPath) {
+        let asset = allPhotos.object(at: indexPath.item)
+        guard let cell = collectionView.cellForItem(at: indexPath) as? AlbumGridCellView
+            else { fatalError("Unexpected cell in collection view") }
+        
+        if cell.isChose {
+            let idx = selectedAssetIdentifierList.firstIndex(of: asset.localIdentifier)!
+            // 移除选中的图片索引
+            selectedAssetIdentifierList.remove(at: idx)
+            cell.textLabel = nil
+            cell.isChose = false
 
-        // 重新设置其他选中图片的选中顺序
-        for (index, item) in selectedPhotoIndexPathList.enumerated() {
-            let c = collectionView.cellForItem(at: item) as! AlbumGridCellView
-            c.textLabel = "\(index + 1)"
+            // 重新设置其他选中图片的选中顺序
+            for (index, identifier) in selectedAssetIdentifierList.enumerated() {
+                for (_, item) in collectionView.visibleCells.enumerated() {
+                    let c = item as! AlbumGridCellView
+                    if c.representedAssetIdentifier == identifier {
+                        c.textLabel = "\(index + 1)"
+                    }
+                }
+            }
+            
+        } else {
+            // 保存选中的图片索引
+            selectedAssetIdentifierList.append(asset.localIdentifier)
+            // 设置选中顺序
+            cell.textLabel = "\(selectedAssetIdentifierList.endIndex)"
+            cell.isChose = true
+            
+            
+    //        imageManager.requestImageData(for: asset, options: nil) { (imageData, dataUTI, orientation, info) in
+    //            let url = PhotoAssetUtil.createFile(data: imageData ?? nil, suffix: ".jpg")
+    //            self.methodChan.invokeMethod(FlutterMethodName.onSelectImage.rawValue, arguments: url)
+    //        }
         }
     }
     
@@ -289,15 +312,83 @@ class AlbumGridView: NSObject, FlutterPlatformView, FlutterStreamHandler, UIColl
     }
 }
 
+class AlbumModel {
+    var title = ""
+    var count = 0
+    var firstImgUri = ""
+    var localIdentifier = ""
+}
+
 extension AlbumGridView {
     // MARK: Flutter Method
     
-    func getAlbumList(result: FlutterResult) {
-        var list: [String] = []
-        smartAlbums.enumerateObjects { (collection, int, _) in
-            list.append(collection.localizedTitle ?? "")
+    // 监听 flutter 方法调用
+    func methodCallHandler(call: FlutterMethodCall, result: @escaping FlutterResult) {
+        if call.method == "getAlbumList" {
+            getAlbumList(result: result)
+        } else if call.method == "getAssetList" {
+            getAssetList(result: result, args: call.arguments)
+        } else {
+            result(FlutterMethodNotImplemented)
         }
-        result(list)
+    }
+    
+    /** 切换显示的相册 */
+    func getAssetList(result: FlutterResult, args: Any?) {
+        guard args != nil, let localIdentifier = args else {
+            return
+        }
+        
+        if localIdentifier is String {
+            let fetchResult = PHAssetCollection.fetchAssetCollections(withLocalIdentifiers: [localIdentifier as! String], options: nil)
+            
+            guard let firstObj = fetchResult.firstObject else {
+                return
+            }
+            let photos = PHAsset.fetchAssets(in: firstObj, options: nil)
+            allPhotos = photos
+            _gridView.reloadData()
+        }
+    }
+    
+    /** 获取相册列表 */
+    func getAlbumList(result: FlutterResult) {
+        var list: [AlbumModel] = []
+        smartAlbums.enumerateObjects { (collection, index, _) in
+            let album = AlbumModel()
+            let result = PHAsset.fetchAssets(in: collection, options: nil)
+            let firstObject = result.firstObject
+            
+            album.count = result.count
+            album.title = collection.localizedTitle ?? ""
+            album.localIdentifier = collection.localIdentifier
+            list.append(album)
+        }
+        
+        userCollections.enumerateObjects { (collection, index, _) in
+            let album = AlbumModel()
+            let result = PHAsset.fetchAssets(in: collection as! PHAssetCollection, options: nil)
+            
+            album.count = result.count
+            album.title = collection.localizedTitle ?? ""
+            album.localIdentifier = collection.localIdentifier
+            list.append(album)
+        }
+        
+        var arr: [Dictionary<String, Any>] = []
+        for item in list {
+            arr.append(["title": item.title,
+                        "count": item.count,
+                        "firstImgUri": item.firstImgUri,
+                        "localIdentifier": item.localIdentifier,
+            ])
+        }
+        result(arr)
+    }
+    
+    func getPhotoList(result: FlutterResult) {
+        let localIdentifier = _args["localIdentifier"] as! String
+        let fetchResult = PHAsset.fetchAssets(withLocalIdentifiers: [localIdentifier], options: nil)
     }
     
     // MARK: FlutterStreamHandler
