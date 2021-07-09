@@ -22,12 +22,14 @@ class AlbumModel {
     this.count,
     this.firstImgUri,
     this.localIdentifier,
+    this.firstAssetLocalIdentifier,
   );
 
   final String title;
   final int count;
   final String firstImgUri;
   final String localIdentifier;
+  final String firstAssetLocalIdentifier;
 
   static AlbumModel fromJson(dynamic json) {
     return AlbumModel(
@@ -35,6 +37,7 @@ class AlbumModel {
       json['count'] as int,
       json['firstImgUri'] as String,
       json['localIdentifier'] as String,
+      json['firstAssetLocalIdentifier'] as String,
     );
   }
 }

@@ -2,11 +2,23 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
+enum Twins3AlbumViewName {
+  gridView,
+  assetView,
+}
+
 class Twins3AlbumView extends StatelessWidget {
   const Twins3AlbumView({
     Key key,
     this.maxCount = 9,
+    this.viewName = Twins3AlbumViewName.gridView,
+    this.assetLocalIdentifier,
   }) : super(key: key);
+
+  final Twins3AlbumViewName viewName;
+
+  /// 当viewName 为 assetView时，图片的唯一标志
+  final String assetLocalIdentifier;
 
   /// 可选图片数量
   final int maxCount;
@@ -18,6 +30,8 @@ class Twins3AlbumView extends StatelessWidget {
     // Pass parameters to the platform side.
     final Map<String, dynamic> creationParams = <String, dynamic>{};
     creationParams['maxCount'] = maxCount;
+    creationParams['viewName'] = viewName.toString();
+    creationParams['assetLocalIdentifier'] = assetLocalIdentifier;
 
     // 平台检测
     switch (defaultTargetPlatform) {

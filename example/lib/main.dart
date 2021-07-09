@@ -31,17 +31,17 @@ class _MyAppState extends State<MyApp> {
         print(value);
       });
 
-      Twins3AlbumChannel.setMethodCallHandler({
-        PlatformMethodName.onSelectImage: (args) {
-          if (args is String) {
-            final file = File(args);
-            file.exists().then((value) => print(value));
-            setState(() {
-              _url = args;
-            });
-          }
-        }
-      });
+      // Twins3AlbumChannel.setMethodCallHandler({
+      //   PlatformMethodName.onSelectImage: (args) {
+      //     if (args is String) {
+      //       final file = File(args);
+      //       file.exists().then((value) => print(value));
+      //       setState(() {
+      //         _url = args;
+      //       });
+      //     }
+      //   }
+      // });
     });
   }
 

@@ -21,6 +21,14 @@ class FLAlbumGridViewFactory: NSObject, FlutterPlatformViewFactory {
         viewIdentifier viewId: Int64,
         arguments args: Any?
     ) -> FlutterPlatformView {
+        let _args = args as! Dictionary<String, Any>
+        if _args["viewName"] is String {
+            let viewName = _args["viewName"] as! String
+            if viewName.contains("assetView") {
+                return AssetImageView(frame: frame, viewIdentifier: viewId, arguments: args, binaryMessenger: messenger)
+            }
+        }
+        
         return AlbumGridView(
             frame: frame,
             viewIdentifier: viewId,
@@ -48,6 +56,8 @@ class AlbumGridView: NSObject, FlutterPlatformView, FlutterStreamHandler, UIColl
     
     var _methodChan: FlutterMethodChannel!
     
+    var _flutterResult: FlutterResult!
+    
     var _args: Dictionary<String, Any>
     var _view: UIView = UIView()
     var _layout: UICollectionViewFlowLayout = UICollectionViewFlowLayout()
@@ -61,13 +71,36 @@ class AlbumGridView: NSObject, FlutterPlatformView, FlutterStreamHandler, UIColl
     fileprivate var _previousPreheatRect = CGRect.zero
     
     var _curAssetList: PHFetchResult<PHAsset>! // 当前显示的图片列表
+    var _allCollections: [PHAssetCollection] = []
     var _smartAlbums: PHFetchResult<PHAssetCollection>! // 智能相册列表
     var _userCollections: PHFetchResult<PHCollection>! // 用户相册列表
+    var _fetchOptions = PHFetchOptions()
     
     let _cellGap: CGFloat = 1 // cell 间距
     let _gridColCount: CGFloat = 3 // 网格每行数量
     
     var _selectedAssetIdentifierList: [String] = []
+    
+    var _albumName: [String] = [
+        "Panoramas", // 全景照片
+//        "Videos", // 视频
+        "Favorites", // 个人收藏
+//        "Time-lapse", // 延时摄影
+        "Hidden", // 已隐藏
+//        "Recently Deleted", // 最近删除
+        "Recents", // 最近项目
+        "Bursts", // 连拍
+//        "Slo-mo", // 慢动作
+//        "Recently Added", // 最近添加
+        "Selfies", // 自拍
+        "Screenshots", // 截屏
+        "Portrait", // 人像
+        "Live Photos", // 实况照片
+        "Animated", // 慢动作
+        "Long Exposure", // 长曝光
+//        "Unable to Upload", // 母鸡
+    ]
+    
     
     init(
         frame: CGRect,
@@ -78,6 +111,7 @@ class AlbumGridView: NSObject, FlutterPlatformView, FlutterStreamHandler, UIColl
         // 初始化view
         _gridView = UICollectionView(frame: CGRect.zero, collectionViewLayout: _layout)
         _args = args as! Dictionary<String, Any>
+        _fetchOptions.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: false)]
         
         super.init()
         
@@ -103,14 +137,37 @@ class AlbumGridView: NSObject, FlutterPlatformView, FlutterStreamHandler, UIColl
     }
     
     func setAlbumData() {
+        // 注册监听器
+        PHPhotoLibrary.shared().register(self)
 
         // 获取相册信息
-        let allPhotosOptions = PHFetchOptions()
-        allPhotosOptions.sortDescriptors = [NSSortDescriptor(key: "creationDate", ascending: true)]
-        _curAssetList = PHAsset.fetchAssets(with: allPhotosOptions)
         _smartAlbums = PHAssetCollection.fetchAssetCollections(with: .smartAlbum, subtype: .albumRegular, options: nil)
         _userCollections = PHCollectionList.fetchTopLevelUserCollections(with: nil)
-        PHPhotoLibrary.shared().register(self)
+        
+        // 合并相册并排序
+        _smartAlbums.enumerateObjects { (collection, index, _) in
+            // 筛选需要的智能相册
+            // 筛选有图片的相册
+            let fetchResult = PHAsset.fetchAssets(in: collection, options: nil)
+            if fetchResult.count > 0 && self._albumName.contains(collection.localizedTitle ?? "") {
+                self._allCollections.append(collection)
+            }
+        }
+        _userCollections.enumerateObjects { (collection, index, _) in
+            let fetchResult = PHAsset.fetchAssets(in: collection as! PHAssetCollection, options: nil)
+            if fetchResult.count > 0 {
+                self._allCollections.append(collection as! PHAssetCollection)
+            }
+            
+        }
+        
+        guard let firstAlbum = _allCollections.first else {
+            return
+        }
+        
+        // 获取第一个相册下图片
+        let photos = PHAsset.fetchAssets(in: firstAlbum, options: _fetchOptions)
+        _curAssetList = photos
     }
     
     func setGridView() {
@@ -121,7 +178,7 @@ class AlbumGridView: NSObject, FlutterPlatformView, FlutterStreamHandler, UIColl
         // 设置collectview允许多选
         _gridView.allowsMultipleSelection = true
         
-        _gridView.backgroundColor = .white
+        _gridView.backgroundColor = .transparent
         
         // 注册cell
         _gridView.register(AlbumGridCellView.self, forCellWithReuseIdentifier: _gridCellReuseIdentifier)
@@ -232,13 +289,10 @@ class AlbumGridView: NSObject, FlutterPlatformView, FlutterStreamHandler, UIColl
             // 设置选中顺序
             cell.textLabel = "\(_selectedAssetIdentifierList.endIndex)"
             cell.isChose = true
-            
-            
-    //        imageManager.requestImageData(for: asset, options: nil) { (imageData, dataUTI, orientation, info) in
-    //            let url = PhotoAssetUtil.createFile(data: imageData ?? nil, suffix: ".jpg")
-    //            self.methodChan.invokeMethod(FlutterMethodName.onSelectImage.rawValue, arguments: url)
-    //        }
         }
+        
+        // 触发flutter回调
+        _methodChan.invokeMethod(FlutterMethodName.onSelectImage.rawValue, arguments: _selectedAssetIdentifierList.count)
     }
     
     // MARK: UIScrollView
@@ -310,29 +364,26 @@ class AlbumGridView: NSObject, FlutterPlatformView, FlutterStreamHandler, UIColl
     }
 }
 
-class AlbumModel {
-    var title = ""
-    var count = 0
-    var firstImgUri = ""
-    var localIdentifier = ""
-}
-
 extension AlbumGridView {
     // MARK: Flutter Method
     
     // 监听 flutter 方法调用
     func methodCallHandler(call: FlutterMethodCall, result: @escaping FlutterResult) {
+        if _flutterResult == nil {
+            _flutterResult = result
+        }
+        
         if call.method == "getAlbumList" {
-            getAlbumList(result: result)
+            getAlbumList()
         } else if call.method == "getAssetList" {
-            getAssetList(result: result, args: call.arguments)
+            getAssetList(args: call.arguments)
         } else {
             result(FlutterMethodNotImplemented)
         }
     }
     
     /** 切换显示的相册 */
-    func getAssetList(result: FlutterResult, args: Any?) {
+    func getAssetList(args: Any?) {
         guard args != nil, let localIdentifier = args else {
             return
         }
@@ -343,45 +394,54 @@ extension AlbumGridView {
             guard let firstObj = fetchResult.firstObject else {
                 return
             }
-            let photos = PHAsset.fetchAssets(in: firstObj, options: nil)
+            
+            let photos = PHAsset.fetchAssets(in: firstObj, options: _fetchOptions)
             _curAssetList = photos
             _gridView.reloadData()
         }
     }
     
     /** 获取相册列表 */
-    func getAlbumList(result: FlutterResult) {
-        var list: [AlbumModel] = []
-        _smartAlbums.enumerateObjects { (collection, index, _) in
-            let album = AlbumModel()
-            let result = PHAsset.fetchAssets(in: collection, options: nil)
-            let firstObject = result.firstObject
-            
-            album.count = result.count
-            album.title = collection.localizedTitle ?? ""
-            album.localIdentifier = collection.localIdentifier
-            list.append(album)
-        }
-        
-        _userCollections.enumerateObjects { (collection, index, _) in
-            let album = AlbumModel()
-            let result = PHAsset.fetchAssets(in: collection as! PHAssetCollection, options: nil)
-            
-            album.count = result.count
-            album.title = collection.localizedTitle ?? ""
-            album.localIdentifier = collection.localIdentifier
-            list.append(album)
-        }
-        
+    func getAlbumList() {
         var arr: [Dictionary<String, Any>] = []
-        for item in list {
-            arr.append(["title": item.title,
-                        "count": item.count,
-                        "firstImgUri": item.firstImgUri,
-                        "localIdentifier": item.localIdentifier,
-            ])
+        
+        // 使用队列获取封面图片
+        let queue = DispatchQueue(label: "imageQueue")
+        let group = DispatchGroup()
+        
+        for collection in _allCollections {
+            let result = PHAsset.fetchAssets(in: collection, options: nil)
+            
+            // 去除无图片的相册
+            guard let firstAsset = result.lastObject else {
+                continue
+            }
+            
+            group.enter()
+            queue.async {
+                let options = PHImageRequestOptions()
+                options.resizeMode = .fast
+                options.deliveryMode = .fastFormat
+                self._imageManager.requestImageData(for: firstAsset, options: options) { (imageData, dataUTI, orientation, info) in
+                    let uri = PhotoAssetUtil.createFile(data: imageData ?? nil, suffix: ".jpg")
+                    arr.append(["title": collection.localizedTitle ?? "",
+                                "count": result.count,
+                                "firstImgUri": uri ?? "",
+                                "localIdentifier": collection.localIdentifier,
+                                "firstAssetLocalIdentifier": firstAsset.localIdentifier,
+                    ])
+
+                    group.leave()
+                }
+            }
         }
-        result(arr)
+        
+        group.notify(queue: DispatchQueue.main) {
+            if self._flutterResult != nil {
+                self._flutterResult(arr)
+            }
+        }
+        
     }
     
     // MARK: FlutterStreamHandler

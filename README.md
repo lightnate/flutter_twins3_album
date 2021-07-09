@@ -31,6 +31,8 @@ flutter build ios --no-codesign
 
 - 在info.plist 添加相关权限申请，如 **NSPhotoLibraryUsageDescription**
 
+- 在info.plist 下添加`CFBundleAllowMixedLocalizations` 为 `true` 使相册名称本地化
+
 - xcode 下，在 `Pods/Development Pods/..../Classes/` 文件夹下编写代码
 
 ![image-20210630171312579](./img/image-20210630171312579.png)

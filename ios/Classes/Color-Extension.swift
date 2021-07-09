@@ -21,6 +21,7 @@ class ColorUtil {
 }
 
 extension UIColor {
+    public static let transparent = ColorUtil.getColorByInt(r: 0, g: 0, b: 0, a: 0)
     public static let primary = ColorUtil.getColorByInt(r: 0, g: 179, b: 119, a: 1)
     public static let primary_99 = ColorUtil.getColorByInt(r: 0, g: 179, b: 119, a: 0.6)
 }
