@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 enum Twins3AlbumViewName {
   gridView,
   assetView,
+  albumPreviewView,
 }
 
 class Twins3AlbumView extends StatelessWidget {

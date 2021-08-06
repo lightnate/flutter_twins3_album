@@ -31,37 +31,15 @@ class _MyAppState extends State<MyApp> {
         print(value);
       });
 
-      // Twins3AlbumChannel.setMethodCallHandler({
-      //   PlatformMethodName.onSelectImage: (args) {
-      //     if (args is String) {
-      //       final file = File(args);
-      //       file.exists().then((value) => print(value));
-      //       setState(() {
-      //         _url = args;
-      //       });
-      //     }
-      //   }
-      // });
-    });
-  }
-
-  // Platform messages are asynchronous, so we initialize in an async method.
-  Future<void> initPlatformState() async {
-    String platformVersion;
-    // Platform messages may fail, so we use a try/catch PlatformException.
-    try {
-      platformVersion = await Twins3Album.platformVersion;
-    } on PlatformException {
-      platformVersion = 'Failed to get platform version.';
-    }
-
-    // If the widget was removed from the tree while the asynchronous platform
-    // message was in flight, we want to discard the reply rather than calling
-    // setState to update our non-existent appearance.
-    if (!mounted) return;
-
-    setState(() {
-      _platformVersion = platformVersion;
+      Twins3AlbumChannel.setMethodCallHandler({
+        PlatformMethodName.onSelectImage: (args) {
+          print(args);
+        },
+        PlatformMethodName.onSelectAlbum: (args) {
+          print(args);
+          Twins3AlbumChannel.getAssetList(args);
+        },
+      });
     });
   }
 
@@ -75,10 +53,12 @@ class _MyAppState extends State<MyApp> {
         body: Center(
             child: Column(
           children: [
-            Image.file(
-              File(_url),
-              width: 100,
-              height: 100,
+            Container(
+              width: double.maxFinite,
+              height: 500,
+              child: Twins3AlbumView(
+                viewName: Twins3AlbumViewName.albumPreviewView,
+              ),
             ),
             Expanded(
               child: Twins3AlbumView(),

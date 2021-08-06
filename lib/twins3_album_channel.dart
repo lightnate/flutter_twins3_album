@@ -2,7 +2,14 @@ import 'dart:async';
 
 import 'package:flutter/services.dart';
 
-enum PlatformMethodName { onSelectImage }
+// 原生事件枚举
+enum PlatformMethodName {
+  /// 选择图片
+  onSelectImage,
+
+  /// 选择相册
+  onSelectAlbum,
+}
 
 /// 字符串转枚举
 T stringToEnum<T>(List<T> enumList, String name) {
@@ -16,61 +23,65 @@ T stringToEnum<T>(List<T> enumList, String name) {
   return result;
 }
 
-class AlbumModel {
-  AlbumModel(
-    this.title,
-    this.count,
-    this.firstImgUri,
+/// 相册信息model
+class AlbumInfoModel {
+  AlbumInfoModel(
     this.localIdentifier,
-    this.firstAssetLocalIdentifier,
+    this.name,
   );
 
-  final String title;
-  final int count;
-  final String firstImgUri;
   final String localIdentifier;
-  final String firstAssetLocalIdentifier;
+  final String name;
 
-  static AlbumModel fromJson(dynamic json) {
-    return AlbumModel(
-      json['title'] as String,
-      json['count'] as int,
-      json['firstImgUri'] as String,
+  static AlbumInfoModel fromJson(dynamic json) {
+    return AlbumInfoModel(
       json['localIdentifier'] as String,
-      json['firstAssetLocalIdentifier'] as String,
+      json['name'] as String,
     );
   }
 }
 
 class Twins3AlbumChannel {
-  static const _methodChan = const MethodChannel('twins3_album');
+  static const _methodChanAlbumGridView = const MethodChannel('AlbumGridView');
+  static const _methodChanAlbumPreviewGridView =
+      const MethodChannel('AlbumPreviewGridView');
   static const _eventChan = const EventChannel('twins3_album_event');
 
   static StreamSubscription<dynamic> _stream;
 
   /// 获取相册列表名称
-  static Future<List<AlbumModel>> getAlbumList() async {
-    List<AlbumModel> albumList = [];
+  static Future<AlbumInfoModel> getFirstAlbumInfo() async {
+    AlbumInfoModel albumInfo;
     try {
-      final list =
-          await _methodChan.invokeMethod<List<dynamic>>('getAlbumList');
-      if (list != null) {
-        albumList = list.map(AlbumModel.fromJson).toList();
+      final result =
+          await _methodChanAlbumGridView.invokeMethod('getFirstAlbumInfo');
+      if (result != null) {
+        albumInfo = AlbumInfoModel.fromJson(result);
       }
     } on PlatformException catch (e) {}
-    return albumList;
+    return albumInfo;
   }
 
   /// 根据相册 localIdentifier 显示相册图片
   static Future<void> getAssetList(String localIdentifier) async {
     try {
-      await _methodChan.invokeMethod('getAssetList', localIdentifier);
+      await _methodChanAlbumGridView.invokeMethod(
+          'getAssetList', localIdentifier);
     } on PlatformException catch (e) {}
   }
 
   /// 监听原生方法
   static void setMethodCallHandler(Map<PlatformMethodName, Function> handler) {
-    _methodChan.setMethodCallHandler((call) async {
+    _methodChanAlbumGridView.setMethodCallHandler((call) async {
+      final name = stringToEnum<PlatformMethodName>(
+          PlatformMethodName.values, call.method);
+      if (name != null) {
+        if (handler.containsKey(name)) {
+          handler[name](call.arguments);
+        }
+      }
+    });
+    _methodChanAlbumPreviewGridView.setMethodCallHandler((call) async {
       final name = stringToEnum<PlatformMethodName>(
           PlatformMethodName.values, call.method);
       if (name != null) {
