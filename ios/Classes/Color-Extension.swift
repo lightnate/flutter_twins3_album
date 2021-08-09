@@ -24,6 +24,7 @@ extension UIColor {
     public static let transparent = ColorUtil.getColorByInt(r: 0, g: 0, b: 0, a: 0)
     public static let primary = ColorUtil.getColorByInt(r: 0, g: 179, b: 119, a: 1)
     public static let primary_99 = ColorUtil.getColorByInt(r: 0, g: 179, b: 119, a: 0.6)
+    public static let white_99 = ColorUtil.getColorByInt(r: 255, g: 255, b: 255, a: 0.6)
     
     @available(iOS 13.0, *)
     static let b20 = UIColor { (trait) -> UIColor in

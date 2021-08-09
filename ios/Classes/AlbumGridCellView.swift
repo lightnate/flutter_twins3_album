@@ -3,12 +3,15 @@ class AlbumGridCellView: UICollectionViewCell {
     var imageView: UIImageView!
     var representedAssetIdentifier: String!
     var isChose = false
-    private var coverView: UIView?
+    private var selectedCoverView: UIView?
     private var selectedLabel: UILabel?
+    private var unselectableCoverView: UIView?
     
     let radius: CGFloat = 12
     
     override init(frame: CGRect) {
+        selectable = true
+        
         super.init(frame: frame)
         
         imageView = UIImageView(frame: CGRect(origin: CGPoint.zero, size: frame.size))
@@ -27,15 +30,28 @@ class AlbumGridCellView: UICollectionViewCell {
         }
     }
     
+    var selectable: Bool {
+        didSet {
+            if selectable {
+                unselectableCoverView?.removeFromSuperview()
+                unselectableCoverView = nil
+            } else {
+                unselectableCoverView = UIView(frame: CGRect(origin: CGPoint.zero, size: frame.size))
+                unselectableCoverView?.backgroundColor = .white_99
+                addSubview(unselectableCoverView!)
+            }
+        }
+    }
+    
     var textLabel: String! {
         didSet {
             if textLabel != nil {
-                coverView?.removeFromSuperview()
+                selectedCoverView?.removeFromSuperview()
                 selectedLabel?.removeFromSuperview()
 
-                coverView = UIView(frame: CGRect(origin: CGPoint.zero, size: frame.size))
-                coverView?.backgroundColor = .primary_99
-                addSubview(coverView!)
+                selectedCoverView = UIView(frame: CGRect(origin: CGPoint.zero, size: frame.size))
+                selectedCoverView?.backgroundColor = .primary_99
+                addSubview(selectedCoverView!)
 
                 let diameter = radius * 2
 
@@ -49,9 +65,9 @@ class AlbumGridCellView: UICollectionViewCell {
 
                 addSubview(selectedLabel!)
             } else {
-                coverView?.removeFromSuperview()
+                selectedCoverView?.removeFromSuperview()
                 selectedLabel?.removeFromSuperview()
-                coverView = nil
+                selectedCoverView = nil
                 selectedLabel = nil
             }
 
@@ -62,6 +78,7 @@ class AlbumGridCellView: UICollectionViewCell {
         super.prepareForReuse()
         imageView.image = nil
         isChose = false
+        selectable = true
     }
     
 }

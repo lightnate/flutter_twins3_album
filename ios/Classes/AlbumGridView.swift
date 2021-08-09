@@ -204,6 +204,11 @@ class AlbumGridView: NSObject, FlutterPlatformView, FlutterStreamHandler, UIColl
         } else {
             cell.textLabel = nil
             cell.isChose = false
+            
+            // 达到最大可选数量时，设置未被选中图片的不可选图层
+            if _selectedAssetIdentifierList.count == _maxCount {
+                cell.selectable = false
+            }
         }
         
         // Request an image for the asset from the PHCachingImageManager.
@@ -259,6 +264,17 @@ class AlbumGridView: NSObject, FlutterPlatformView, FlutterStreamHandler, UIColl
                 // 设置选中顺序
                 cell.textLabel = "\(_selectedAssetIdentifierList.endIndex)"
                 cell.isChose = true
+            }
+        }
+        
+        // 当前选择数量等于可选数量时，设置不可选图层
+        for c in _gridView.visibleCells {
+            let cell = c as! AlbumGridCellView
+            if _selectedAssetIdentifierList.count == _maxCount && !cell.isChose && cell.selectable {
+                cell.selectable = false
+            }
+            if _selectedAssetIdentifierList.count < _maxCount && !cell.selectable {
+                cell.selectable = true
             }
         }
         
