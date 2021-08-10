@@ -37,9 +37,15 @@ class AlbumPreviewGridView: NSObject, FlutterPlatformView, UICollectionViewDeleg
         _methodChan = FlutterMethodChannel(name: "AlbumPreviewGridView", binaryMessenger: messenger!)
         _methodChan.setMethodCallHandler(methodCallHandler)
         
-        setGridView()
-        setAlbumData()
-        createNativeView(view: _view)
+        checkPhotoAuthorization {
+            DispatchQueue.main.async {
+                self.setAlbumData()
+                self.setGridView()
+                self.createNativeView(view: self._view)
+            }
+        } error: { (status) in
+            // 无相册权限
+        }
     }
     
     func view() -> UIView {

@@ -5,6 +5,7 @@ import PhotosUI
 
 /** flutter端方法名称 */
 enum FlutterMethodName: String {
+    case onReady
     case onSelectImage
     case onSelectAlbum
 }
@@ -65,6 +66,7 @@ class AlbumGridView: NSObject, FlutterPlatformView, FlutterStreamHandler, UIColl
     var _view: UIView = UIView()
     var _layout: UICollectionViewFlowLayout = UICollectionViewFlowLayout()
     var _gridView: UICollectionView
+    var _tipView = UILabel()
     
     let _width = UIScreen.main.bounds.size.width //获取屏幕宽
     let _gridCellReuseIdentifier = "AlbumGridCellView"
@@ -110,9 +112,20 @@ class AlbumGridView: NSObject, FlutterPlatformView, FlutterStreamHandler, UIColl
         _eventChan = FlutterEventChannel(name: "twins3_album_event", binaryMessenger: messenger!)
         _eventChan.setStreamHandler(self)
         
-        setAlbumData()
-        setGridView()
-        createNativeView(view: _view)
+        checkPhotoAuthorization {
+            DispatchQueue.main.async {
+                self.setAlbumData()
+                self.setGridView()
+                self.createNativeView(view: self._view)
+                
+                self._methodChan.invokeMethod(FlutterMethodName.onReady.rawValue, arguments: nil)
+            }
+        } error: { (status) in
+            // 无相册权限
+            DispatchQueue.main.async {
+                self.showTipView()
+            }
+        }
     }
     
     deinit {
@@ -179,15 +192,43 @@ class AlbumGridView: NSObject, FlutterPlatformView, FlutterStreamHandler, UIColl
         _gridView.superview?.addConstraint(right)
     }
     
+    func showTipView() {
+        
+        let infoDictionary = Bundle.main.infoDictionary!
+        let appDisplayName = infoDictionary["CFBundleDisplayName"] ?? "" //程序名称
+        _tipView.text = "无法访问相册，请在设置->隐私->照片中，允许\(appDisplayName)访问手机相册。"
+        _tipView.numberOfLines = 0
+        _tipView.textAlignment = .center
+        _tipView.font = UIFont.boldSystemFont(ofSize: 17)
+        if #available(iOS 13.0, *) {
+            _tipView.textColor = .b20
+        } else {
+            _tipView.textColor = .b_20
+        }
+        _view.addSubview(_tipView)
+        
+        // 设置约束
+        _tipView.translatesAutoresizingMaskIntoConstraints = false
+        let top = NSLayoutConstraint(item: _tipView, attribute: .top, relatedBy: .equal, toItem: _view, attribute: .top, multiplier:1.0, constant: 0)
+        let bottom = NSLayoutConstraint(item: _tipView, attribute: .bottom, relatedBy: .equal, toItem: _view, attribute: .bottom, multiplier:1.0, constant: 0)
+        let left = NSLayoutConstraint(item: _tipView, attribute: .left, relatedBy: .equal, toItem: _view, attribute: .left, multiplier:1.0, constant: 32)
+        let right = NSLayoutConstraint(item: _tipView, attribute: .right, relatedBy: .equal, toItem: _view, attribute:.right, multiplier:1.0, constant: -32)
+        _tipView.superview?.addConstraint(top)
+        _tipView.superview?.addConstraint(bottom)
+        _tipView.superview?.addConstraint(left)
+        _tipView.superview?.addConstraint(right)
+    }
+    
     // MARK: PHPhotoLibraryChangeObserver
     
     func photoLibraryDidChange(_ changeInstance: PHChange) {
+        debugPrint("photoLibraryDidChange")
     }
     
     // MARK: UICollectionView
     
     func collectionView(_ collectionView: UICollectionView, numberOfItemsInSection section: Int) -> Int {
-        return _curAssetList.count;
+        return _curAssetList?.count ?? 0;
     }
     
     // 渲染cell

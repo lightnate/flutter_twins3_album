@@ -4,6 +4,8 @@ import 'package:flutter/services.dart';
 
 // 原生事件枚举
 enum PlatformMethodName {
+  /// 初始化完毕
+  onReady,
   /// 选择图片
   onSelectImage,
 
