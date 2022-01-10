@@ -14,8 +14,8 @@ enum PlatformMethodName {
 }
 
 /// 字符串转枚举
-T stringToEnum<T>(List<T> enumList, String name) {
-  T result;
+T? stringToEnum<T>(List<T> enumList, String name) {
+  T? result;
   for (var i = 0; i < enumList.length; i++) {
     if (enumList[i].toString().contains(name)) {
       result = enumList[i];
@@ -49,11 +49,11 @@ class Twins3AlbumChannel {
       const MethodChannel('AlbumPreviewGridView');
   static const _eventChan = const EventChannel('twins3_album_event');
 
-  static StreamSubscription<dynamic> _stream;
+  static StreamSubscription<dynamic>? _stream;
 
   /// 获取相册列表名称
-  static Future<AlbumInfoModel> getFirstAlbumInfo() async {
-    AlbumInfoModel albumInfo;
+  static Future<AlbumInfoModel?> getFirstAlbumInfo() async {
+    AlbumInfoModel? albumInfo;
     try {
       final result =
           await _methodChanAlbumGridView.invokeMethod('getFirstAlbumInfo');
@@ -79,7 +79,7 @@ class Twins3AlbumChannel {
           PlatformMethodName.values, call.method);
       if (name != null) {
         if (handler.containsKey(name)) {
-          handler[name](call.arguments);
+          handler[name]!(call.arguments);
         }
       }
     });
@@ -88,14 +88,14 @@ class Twins3AlbumChannel {
           PlatformMethodName.values, call.method);
       if (name != null) {
         if (handler.containsKey(name)) {
-          handler[name](call.arguments);
+          handler[name]!(call.arguments);
         }
       }
     });
   }
 
-  static void startEventListener(void Function(dynamic) onData,
-      {Function onError, void Function() onDone, bool cancelOnError}) {
+  static void startEventListener(void Function(dynamic)? onData,
+      {Function? onError, void Function()? onDone, bool? cancelOnError}) {
     _stream = _eventChan.receiveBroadcastStream().listen(
           onData,
           onError: onError,
@@ -106,7 +106,7 @@ class Twins3AlbumChannel {
 
   static void cancelEventListner() {
     if (_stream != null) {
-      _stream.cancel();
+      _stream!.cancel();
       _stream = null;
     }
   }

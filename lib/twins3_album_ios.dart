@@ -10,10 +10,10 @@ enum Twins3AlbumViewName {
 
 class Twins3AlbumView extends StatelessWidget {
   const Twins3AlbumView({
-    Key key,
+    Key? key,
     this.maxCount = 9,
     this.viewName = Twins3AlbumViewName.gridView,
-    this.assetLocalIdentifier,
+    this.assetLocalIdentifier = "",
   }) : super(key: key);
 
   final Twins3AlbumViewName viewName;

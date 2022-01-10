@@ -27,9 +27,9 @@ class _MyAppState extends State<MyApp> {
     // initPlatformState();
 
     var timer = Timer(Duration(seconds: 1), () {
-      Twins3AlbumChannel.getAlbumList().then((value) {
-        print(value);
-      });
+      // Twins3AlbumChannel.getAlbumList().then((value) {
+      //   print(value);
+      // });
 
       Twins3AlbumChannel.setMethodCallHandler({
         PlatformMethodName.onSelectImage: (args) {
